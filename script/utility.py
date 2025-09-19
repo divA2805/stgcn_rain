@@ -185,4 +185,45 @@ def evaluate_metric(model, data_iter, scaler, mask=None):
         WMAPE = np.sum(np.array(mae)) / (np.sum(np.array(sum_y)) + 1e-8)
         r2 = r2_score(all_y, all_y_pred)
         return MAE, RMSE, WMAPE, r2
+
+
+
+from sklearn.metrics import r2_score
+import numpy as np
+
+def nearest_station_idx(target_latlon, labeled_latlons):
+    dists = np.linalg.norm(labeled_latlons - target_latlon, axis=1)
+    return np.argmin(dists)
+
+def r2_for_targets(preds, true_labels, features, is_labeled, is_target):
+    # preds: [n_stations, n_days]
+    # true_labels: [n_stations, n_days]
+    # features: [n_stations, 5]
+    # is_labeled, is_target: [n_stations]
+    r2_scores = []
+    labeled_latlons = features[is_labeled][:, :2]
+    target_latlons = features[is_target][:, :2]
+    for i, target_latlon in enumerate(target_latlons):
+        nearest_idx = nearest_station_idx(target_latlon, labeled_latlons)
+        labeled_rainfall = true_labels[is_labeled][nearest_idx]
+        predicted_rainfall = preds[is_target][i]
+        score = r2_score(labeled_rainfall, predicted_rainfall)
+        r2_scores.append(score)
+    return r2_scores
+
+def get_predictions(model, test_iter, zscore):
+    # Returns inverse scaled predictions for all stations
+    model.eval()
+    preds = []
+    with torch.no_grad():
+        for x, y in test_iter:
+            out = model(x)
+            y_pred = out[:, -1, ...]
+            if y_pred.dim() == 3 and y_pred.shape[1] == 1:
+                y_pred = y_pred.squeeze(1)
+            preds.append(y_pred.cpu().numpy())
+    preds = np.concatenate(preds, axis=0)
+    # Inverse transform if using scaler
+    preds = zscore.inverse_transform(preds)
+    return preds
         
