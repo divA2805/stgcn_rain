@@ -51,3 +51,15 @@ def data_transform(data, n_his, n_pred, device):
         y[i] = data[tail + n_pred - 1]
 
     return torch.Tensor(x).to(device), torch.Tensor(y).to(device)
+
+
+import pandas as pd
+import numpy as np
+
+def load_rainfall_data(csv_path):
+    df = pd.read_csv(csv_path)
+    features = df.iloc[:, 0:5].values  # [n_stations, 5]
+    rainfall = df.iloc[:, 5:35].values # [n_stations, 30]
+    is_labeled = np.any(rainfall != 0, axis=1)  # [n_stations]
+    is_target = ~is_labeled
+    return features, rainfall, is_labeled, is_target
