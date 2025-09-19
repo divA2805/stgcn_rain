@@ -361,7 +361,8 @@ def data_preparate(args, device):
     len_test = int(math.floor(data_col * val_and_test_rate))
     len_train = int(data_col - len_val - len_test)
     
-    train, val, test = dataloader.load_data(args.dataset, len_train, len_val)
+    #train, val, test = dataloader.load_data(args.dataset, len_train, len_val)
+    train, val, test = dataloader.load_data(args.dataset, len_train, len_val, args.n_his, args.n_pred)
     zscore = preprocessing.StandardScaler()
     train = zscore.fit_transform(train)
     val = zscore.transform(val)
