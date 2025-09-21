@@ -87,28 +87,47 @@ def load_adj(dataset_name):
 
     return adj, n_vertex
 
-def load_data(dataset_name, len_train, len_val, n_his, n_pred):
+# def load_data(dataset_name, len_train, len_val, n_his, n_pred):
+#     dataset_path = './data'
+#     dataset_path = os.path.join(dataset_path, dataset_name)
+#     vel = pd.read_csv(os.path.join(dataset_path, 'vel.csv')).values  # shape: [timesteps, stations]
+
+#     n_timesteps = vel.shape[0]
+#     # Ensure each split has enough for at least one sample in data_transform
+#     min_len = n_his + n_pred
+#     if len_train < min_len:
+#         raise ValueError(f"Train set too small for n_his={n_his}, n_pred={n_pred}")
+#     if len_val < min_len:
+#         # If not enough for val, skip val, add to train
+#         len_val = 0
+#     if n_timesteps - len_train - len_val < min_len:
+#         # If not enough for test, skip test, add to train
+#         len_test = 0
+#     else:
+#         len_test = n_timesteps - len_train - len_val
+
+#     train = vel[:len_train, :]
+#     val = vel[len_train:len_train + len_val, :] if len_val > 0 else np.empty((0, vel.shape[1]))
+#     test = vel[len_train + len_val:, :] if len_test > 0 else np.empty((0, vel.shape[1]))
+#     return train, val, test
+
+def load_data(dataset_name, len_train, len_val):
     dataset_path = './data'
     dataset_path = os.path.join(dataset_path, dataset_name)
-    vel = pd.read_csv(os.path.join(dataset_path, 'vel.csv')).values  # shape: [timesteps, stations]
+    vel = pd.read_csv(os.path.join(dataset_path, 'vel.csv')).values  # ensure this is a numpy array
 
-    n_timesteps = vel.shape[0]
-    # Ensure each split has enough for at least one sample in data_transform
-    min_len = n_his + n_pred
-    if len_train < min_len:
-        raise ValueError(f"Train set too small for n_his={n_his}, n_pred={n_pred}")
-    if len_val < min_len:
-        # If not enough for val, skip val, add to train
-        len_val = 0
-    if n_timesteps - len_train - len_val < min_len:
-        # If not enough for test, skip test, add to train
-        len_test = 0
-    else:
-        len_test = n_timesteps - len_train - len_val
+    total_len = vel.shape[0]  # number of rows (timesteps)
+    len_test = total_len - len_train - len_val
 
-    train = vel[:len_train, :]
-    val = vel[len_train:len_train + len_val, :] if len_val > 0 else np.empty((0, vel.shape[1]))
-    test = vel[len_train + len_val:, :] if len_test > 0 else np.empty((0, vel.shape[1]))
+    # Ensure each split is at least n_his + n_pred
+    min_len = 3 + 1  # or use args.n_his + args.n_pred
+    if len_train < min_len or len_val < min_len or len_test < min_len:
+        raise ValueError(f"Not enough timesteps in train/val/test splits! "
+                         f"Got train={len_train}, val={len_val}, test={len_test}, min required={min_len}")
+
+    train = vel[:len_train]
+    val = vel[len_train:len_train + len_val]
+    test = vel[len_train + len_val:]
     return train, val, test
 
 def data_transform(data, n_his, n_pred, device):
