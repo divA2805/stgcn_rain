@@ -527,6 +527,11 @@ def test(zscore, loss, model, test_iter, args, is_target):
     print("Number of labeled:", is_labeled.sum())
     print("Target indices:", np.where(is_target)[0])
     print("Labeled indices:", np.where(is_labeled)[0])
+    print("preds shape:", preds.shape)
+    print("rainfall shape:", rainfall.shape)
+    print("features shape:", features.shape)
+    print("is_labeled shape:", is_labeled.shape)
+    print("is_target shape:", is_target.shape)
     # Calculate R2 for each target station vs nearest labeled station
     r2_scores = r2_for_targets(preds, rainfall, features, is_labeled_vec, is_target_vec)
     print("R2 scores for all target stations:", r2_scores)
