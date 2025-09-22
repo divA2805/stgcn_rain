@@ -589,8 +589,17 @@ def test(zscore, loss, model, test_iter, args, is_target):
     features, rainfall, is_labeled_vec, is_target_vec = load_rainfall_data('./data/RainFallData_merged_1to30.csv')
     min_days = min(rainfall.shape[1], preds_full.shape[1])
     preds_for_rainfall = preds_full[:, :min_days]
-
-    # Calculate R2 for target stations vs nearest labeled station
+    print("Total stations:", len(is_labeled))
+    print("Labeled stations:", np.sum(is_labeled))
+    print("Target stations:", np.sum(is_target))
+    print("Example labeled indices:", np.where(is_labeled)[0][:10])
+    print("Example target indices:", np.where(is_target)[0][:10])
+    print("preds shape:", preds.shape)
+    print("rainfall shape:", rainfall.shape)
+    print("features shape:", features.shape)
+    print("is_labeled shape:", is_labeled.shape)
+    print("is_target shape:", is_target.shape)
+    #Calculate R2 for target stations vs nearest labeled station
     from script.utility import r2_for_targets
     r2_scores = r2_for_targets(preds_for_rainfall, rainfall, features, is_labeled_vec, is_target_vec)
     print("R2 scores for all target stations:", r2_scores)
