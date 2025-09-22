@@ -210,11 +210,40 @@ def nearest_station_idx(target_latlon, labeled_latlons):
 #         score = r2_score(labeled_rainfall, predicted_rainfall)
 #         r2_scores.append(score)
 #     return r2_scores
+# def r2_for_targets(preds, true_labels, features, is_labeled, is_target):
+#     # preds: [n_stations, n_days]
+#     # true_labels: [n_stations, n_days]
+#     # features: [n_stations, 5]
+#     # is_labeled, is_target: [n_stations]
+#     r2_scores = []
+#     labeled_latlons = features[is_labeled][:, :2]
+#     target_latlons = features[is_target][:, :2]
+#     target_indices = np.where(is_target)[0]
+#     labeled_indices = np.where(is_labeled)[0]
+#     for i, target_latlon in enumerate(target_latlons):
+#         nearest_idx = nearest_station_idx(target_latlon, labeled_latlons)
+#         labeled_rainfall = true_labels[is_labeled][nearest_idx]
+#         predicted_rainfall = preds[is_target][i]
+
+#         # Debugging: print arrays
+#         print(f"Target {target_indices[i]}: nearest labeled {labeled_indices[nearest_idx]}")
+#         print("labeled_rainfall:", labeled_rainfall)
+#         print("predicted_rainfall:", predicted_rainfall)
+
+#         # R2 needs non-constant ground truth
+#         if np.all(labeled_rainfall == labeled_rainfall[0]):
+#             print(f"Skipping target {target_indices[i]}: labeled rainfall is constant")
+#             r2_scores.append(np.nan)
+#             continue
+#         try:
+#             score = r2_score(labeled_rainfall, predicted_rainfall)
+#         except Exception as e:
+#             print(f"Error computing R² for target {target_indices[i]}: {e}")
+#             score = np.nan
+#         r2_scores.append(score)
+#     return r2_scores
+
 def r2_for_targets(preds, true_labels, features, is_labeled, is_target):
-    # preds: [n_stations, n_days]
-    # true_labels: [n_stations, n_days]
-    # features: [n_stations, 5]
-    # is_labeled, is_target: [n_stations]
     r2_scores = []
     labeled_latlons = features[is_labeled][:, :2]
     target_latlons = features[is_target][:, :2]
@@ -225,22 +254,19 @@ def r2_for_targets(preds, true_labels, features, is_labeled, is_target):
         labeled_rainfall = true_labels[is_labeled][nearest_idx]
         predicted_rainfall = preds[is_target][i]
 
-        # Debugging: print arrays
         print(f"Target {target_indices[i]}: nearest labeled {labeled_indices[nearest_idx]}")
         print("labeled_rainfall:", labeled_rainfall)
         print("predicted_rainfall:", predicted_rainfall)
+        print("Is labeled rainfall constant?", np.all(labeled_rainfall == labeled_rainfall[0]))
 
-        # R2 needs non-constant ground truth
-        if np.all(labeled_rainfall == labeled_rainfall[0]):
-            print(f"Skipping target {target_indices[i]}: labeled rainfall is constant")
-            r2_scores.append(np.nan)
-            continue
+        # Always try to compute R2, catch any error
         try:
             score = r2_score(labeled_rainfall, predicted_rainfall)
         except Exception as e:
             print(f"Error computing R² for target {target_indices[i]}: {e}")
             score = np.nan
         r2_scores.append(score)
+    print("R2 scores (first 10):", r2_scores[:10])
     return r2_scores
 
 def get_predictions(model, test_iter, zscore):
