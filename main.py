@@ -505,35 +505,94 @@ def val(model, val_iter, is_labeled, loss):
         n += y.shape[0]
     return torch.tensor(l_sum / n)
 
-@torch.no_grad()
+# @torch.no_grad()
+# def test(zscore, loss, model, test_iter, args, is_target):
+#     model.load_state_dict(torch.load("STGCN_" + args.dataset + ".pt"))
+#     model.eval()
+#     test_MSE = utility.evaluate_model(model, loss, test_iter, mask=is_target)
+#     test_MAE, test_RMSE, test_WMAPE, test_R2 = utility.evaluate_metric(model, test_iter, zscore, mask=is_target)
+#     print(f"Test loss {test_MSE:.6f} | MAE {test_MAE:.6f} | RMSE {test_RMSE:.6f} | WMAPE {test_WMAPE:.8f} | R2 {test_R2:.4f}")
+
+#     # NEW: get prediction array
+#     preds = utility.get_predictions(model, test_iter, zscore)
+#     # Load full rainfall data and features
+#     features, rainfall, is_labeled_vec, is_target_vec = load_rainfall_data(f'./data/RainFallData_merged_1to30.csv')
+#     print("Total stations:", len(is_labeled))
+#     print("Labeled stations:", np.sum(is_labeled))
+#     print("Target stations:", np.sum(is_target))
+#     print("Example labeled indices:", np.where(is_labeled)[0][:10])
+#     print("Example target indices:", np.where(is_target)[0][:10])
+#     # print("Total stations:", len(is_target))
+#     # print("Number of targets:", is_target.sum())
+#     # print("Number of labeled:", is_labeled.sum())
+#     # print("Target indices:", np.where(is_target)[0])
+#     # print("Labeled indices:", np.where(is_labeled)[0])
+#     print("preds shape:", preds.shape)
+#     print("rainfall shape:", rainfall.shape)
+#     print("features shape:", features.shape)
+#     print("is_labeled shape:", is_labeled.shape)
+#     print("is_target shape:", is_target.shape)
+#     # Calculate R2 for each target station vs nearest labeled station
+#     r2_scores = r2_for_targets(preds, rainfall, features, is_labeled_vec, is_target_vec)
+#     print("R2 scores for all target stations:", r2_scores)
+
+# Add this utility function near your other imports / utilities
+def get_full_predictions(model, data, n_his, n_pred, device, scaler=None):
+    """
+    Reconstructs full predictions for all stations and timesteps from sliding windows.
+    data: [timesteps, stations] (e.g., vel.csv values)
+    Returns: preds_full [stations, timesteps]
+    """
+    n_vertex = data.shape[1]
+    len_record = len(data)
+    num = len_record - n_his - n_pred + 1
+    x = np.zeros([num, 1, n_his, n_vertex])
+    for i in range(num):
+        x[i, :, :, :] = data[i:i+n_his].reshape(1, n_his, n_vertex)
+    x_tensor = torch.Tensor(x).to(device)
+    with torch.no_grad():
+        out = model(x_tensor)
+        y_pred = out[:, -1, ...]
+        if y_pred.dim() == 3 and y_pred.shape[1] == 1:
+            y_pred = y_pred.squeeze(1)
+        preds = y_pred.cpu().numpy()
+    # Inverse transform if scaler used
+    if scaler is not None:
+        preds = scaler.inverse_transform(preds)
+    # Build full prediction array
+    preds_full = np.zeros((n_vertex, len_record))
+    for i in range(num):
+        day = i + n_his + n_pred - 1
+        preds_full[:, day] = preds[i]
+    return preds_full
+
+# Replace your current test() logic with the following:
+@torch.no_grad() 
 def test(zscore, loss, model, test_iter, args, is_target):
+    # Load best weights
     model.load_state_dict(torch.load("STGCN_" + args.dataset + ".pt"))
     model.eval()
+
+    # Standard metrics (unchanged)
     test_MSE = utility.evaluate_model(model, loss, test_iter, mask=is_target)
     test_MAE, test_RMSE, test_WMAPE, test_R2 = utility.evaluate_metric(model, test_iter, zscore, mask=is_target)
     print(f"Test loss {test_MSE:.6f} | MAE {test_MAE:.6f} | RMSE {test_RMSE:.6f} | WMAPE {test_WMAPE:.8f} | R2 {test_R2:.4f}")
 
-    # NEW: get prediction array
-    preds = utility.get_predictions(model, test_iter, zscore)
-    # Load full rainfall data and features
-    features, rainfall, is_labeled_vec, is_target_vec = load_rainfall_data(f'./data/RainFallData_merged_1to30.csv')
-    print("Total stations:", len(is_labeled))
-    print("Labeled stations:", np.sum(is_labeled))
-    print("Target stations:", np.sum(is_target))
-    print("Example labeled indices:", np.where(is_labeled)[0][:10])
-    print("Example target indices:", np.where(is_target)[0][:10])
-    # print("Total stations:", len(is_target))
-    # print("Number of targets:", is_target.sum())
-    # print("Number of labeled:", is_labeled.sum())
-    # print("Target indices:", np.where(is_target)[0])
-    # print("Labeled indices:", np.where(is_labeled)[0])
-    print("preds shape:", preds.shape)
-    print("rainfall shape:", rainfall.shape)
-    print("features shape:", features.shape)
-    print("is_labeled shape:", is_labeled.shape)
-    print("is_target shape:", is_target.shape)
-    # Calculate R2 for each target station vs nearest labeled station
-    r2_scores = r2_for_targets(preds, rainfall, features, is_labeled_vec, is_target_vec)
+    # NEW: get full predictions for all stations/timesteps
+    import pandas as pd
+    vel = pd.read_csv(f'./data/{args.dataset}/vel.csv').values
+    preds_full = get_full_predictions(model, vel, args.n_his, args.n_pred, args.enable_cuda and torch.cuda.is_available() and torch.device('cuda') or torch.device('cpu'), scaler=zscore)
+    print("preds_full shape:", preds_full.shape)
+
+    # Align shapes for rainfall (if rainfall is shorter, crop predictions)
+    from script.dataloader import load_rainfall_data
+    features, rainfall, is_labeled_vec, is_target_vec = load_rainfall_data('./data/RainFallData_merged_1to30.csv')
+    min_days = min(rainfall.shape[1], preds_full.shape[1])
+    preds_for_rainfall = preds_full[:, :min_days]
+
+    # Calculate R2 for target stations vs nearest labeled station
+    from script.utility import r2_for_targets
+    r2_scores = r2_for_targets(preds_for_rainfall, rainfall, features, is_labeled_vec, is_target_vec)
     print("R2 scores for all target stations:", r2_scores)
 
 if __name__ == "__main__":
