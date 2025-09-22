@@ -517,6 +517,11 @@ def test(zscore, loss, model, test_iter, args, is_target):
     preds = utility.get_predictions(model, test_iter, zscore)
     # Load full rainfall data and features
     features, rainfall, is_labeled_vec, is_target_vec = load_rainfall_data(f'./data/RainFallData_merged_1to30.csv')
+    print("Total stations:", len(is_labeled))
+    print("Labeled stations:", np.sum(is_labeled))
+    print("Target stations:", np.sum(is_target))
+    print("Example labeled indices:", np.where(is_labeled)[0][:10])
+    print("Example target indices:", np.where(is_target)[0][:10])
     # Calculate R2 for each target station vs nearest labeled station
     r2_scores = r2_for_targets(preds, rainfall, features, is_labeled_vec, is_target_vec)
     print("R2 scores for all target stations:", r2_scores)
