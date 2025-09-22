@@ -342,6 +342,46 @@ def get_parameters():
     
     return args, device, blocks
 
+# def data_preparate(args, device):    
+#     adj, n_vertex = dataloader.load_adj(args.dataset)
+#     gso = utility.calc_gso(adj, args.gso_type)
+#     if args.graph_conv_type == 'cheb_graph_conv':
+#         gso = utility.calc_chebynet_gso(gso)
+#     gso = gso.toarray()
+#     gso = gso.astype(dtype=np.float32)
+#     args.gso = torch.from_numpy(gso).to(device)
+
+#     dataset_path = './data'
+#     dataset_path = os.path.join(dataset_path, args.dataset)
+#     data_col = pd.read_csv(os.path.join(dataset_path, 'vel.csv')).shape[0]
+#     # PATCH: train/val/test split ratio update
+#     # 80:10:10 split
+#     val_and_test_rate = 0.10
+#     len_val = int(math.floor(data_col * val_and_test_rate))
+#     len_test = int(math.floor(data_col * val_and_test_rate))
+#     len_train = int(data_col - len_val - len_test)
+    
+#     #train, val, test = dataloader.load_data(args.dataset, len_train, len_val)
+#     train, val, test = dataloader.load_data(args.dataset, len_train, len_val, args.n_his, args.n_pred)
+#     zscore = preprocessing.StandardScaler()
+#     train = zscore.fit_transform(train)
+#     val = zscore.transform(val)
+#     test = zscore.transform(test)
+
+#     x_train, y_train = dataloader.data_transform(train, args.n_his, args.n_pred, device)
+#     x_val, y_val = dataloader.data_transform(val, args.n_his, args.n_pred, device)
+#     x_test, y_test = dataloader.data_transform(test, args.n_his, args.n_pred, device)
+
+#     train_data = utils.data.TensorDataset(x_train, y_train)
+#     train_iter = utils.data.DataLoader(dataset=train_data, batch_size=args.batch_size, shuffle=False)
+#     val_data = utils.data.TensorDataset(x_val, y_val)
+#     val_iter = utils.data.DataLoader(dataset=val_data, batch_size=args.batch_size, shuffle=False)
+#     test_data = utils.data.TensorDataset(x_test, y_test)
+#     test_iter = utils.data.DataLoader(dataset=test_data, batch_size=args.batch_size, shuffle=False)
+
+#     return n_vertex, zscore, train_iter, val_iter, test_iter
+
+
 def data_preparate(args, device):    
     adj, n_vertex = dataloader.load_adj(args.dataset)
     gso = utility.calc_gso(adj, args.gso_type)
@@ -353,16 +393,21 @@ def data_preparate(args, device):
 
     dataset_path = './data'
     dataset_path = os.path.join(dataset_path, args.dataset)
-    data_col = pd.read_csv(os.path.join(dataset_path, 'vel.csv')).shape[0]
-    # PATCH: train/val/test split ratio update
-    # 80:10:10 split
-    val_and_test_rate = 0.10
+    vel = pd.read_csv(os.path.join(dataset_path, 'vel.csv')).values
+    data_col = vel.shape[0]  # number of timesteps
+
+    val_and_test_rate = 0.20
     len_val = int(math.floor(data_col * val_and_test_rate))
     len_test = int(math.floor(data_col * val_and_test_rate))
-    len_train = int(data_col - len_val - len_test)
-    
-    #train, val, test = dataloader.load_data(args.dataset, len_train, len_val)
-    train, val, test = dataloader.load_data(args.dataset, len_train, len_val, args.n_his, args.n_pred)
+    len_train = data_col - len_val - len_test
+
+    # Add a check here!
+    min_len = args.n_his + args.n_pred
+    if len_train < min_len or len_val < min_len or len_test < min_len:
+        raise ValueError(f"Not enough timesteps in train/val/test splits! "
+                         f"Got train={len_train}, val={len_val}, test={len_test}, min required={min_len}")
+
+    train, val, test = dataloader.load_data(args.dataset, len_train, len_val)
     zscore = preprocessing.StandardScaler()
     train = zscore.fit_transform(train)
     val = zscore.transform(val)
@@ -380,7 +425,7 @@ def data_preparate(args, device):
     test_iter = utils.data.DataLoader(dataset=test_data, batch_size=args.batch_size, shuffle=False)
 
     return n_vertex, zscore, train_iter, val_iter, test_iter
-
+    
 def prepare_model(args, blocks, n_vertex):
     loss = nn.MSELoss()
     es = earlystopping.EarlyStopping(delta=0.0, 
