@@ -594,7 +594,7 @@ def test(zscore, loss, model, test_iter, args, is_target):
     print("Target stations:", np.sum(is_target))
     print("Example labeled indices:", np.where(is_labeled)[0][:10])
     print("Example target indices:", np.where(is_target)[0][:10])
-    print("preds shape:", preds.shape)
+    print("preds shape:", preds_full.shape)
     print("rainfall shape:", rainfall.shape)
     print("features shape:", features.shape)
     print("is_labeled shape:", is_labeled.shape)
