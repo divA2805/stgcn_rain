@@ -616,6 +616,10 @@ def test(zscore, loss, model, test_iter, args, is_target):
     print("features shape:", features.shape)
     print("is_labeled shape:", is_labeled.shape)
     print("is_target shape:", is_target.shape)
+
+    print("Sample labeled rainfall:", rainfall_aligned[is_labeled][0])
+    print("Sample predicted rainfall:", preds_for_rainfall[is_target][0])
+    print("Is labeled rainfall constant?", np.all(rainfall_aligned[is_labeled][0] == rainfall_aligned[is_labeled][0][0]))
     r2_scores = r2_for_targets(preds_for_rainfall, rainfall_aligned, features, is_labeled_vec, is_target_vec)
     print("R2 scores for all target stations:", r2_scores)
 
